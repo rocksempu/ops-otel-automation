@@ -19,7 +19,7 @@ if len(sys.argv) > 2 and sys.argv[2] == "--dry-run":
     DRY_RUN = True
 
 if not GRAFANA_URL or not GRAFANA_TOKEN:
-    print("Erro: Credenciais do Grafana não encontradas.")
+    print("[ERRO] Credenciais do Grafana nao encontradas.")
     sys.exit(1)
 
 HEADERS = {
@@ -27,30 +27,30 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-mode_str = "[SIMULAÇÃO]" if DRY_RUN else "[EXECUÇÃO]"
-print(f"--- {mode_str} Limpeza para o serviço: {SERVICE_NAME} ---")
+mode_str = "[SIMULACAO]" if DRY_RUN else "[EXECUCAO]"
+print(f"--- {mode_str} Limpeza para o servico: {SERVICE_NAME} ---")
 
 # Função auxiliar para deletar (ou fingir)
 def delete_resource(url, resource_name):
     try:
         if DRY_RUN:
             # No modo simulação, apenas verificamos se existe
-            check = requests.get(url, headers=HEADERS, verify=VERIFY_SSL) # <--- SSL OFF
+            check = requests.get(url, headers=HEADERS, verify=VERIFY_SSL)
             if check.status_code == 200:
-                print(f"🔍 ENCONTRADO: {resource_name} (Seria deletado)")
+                print(f"[ENCONTRADO] {resource_name} (Seria deletado)")
             else:
-                print(f"⚪ Não encontrado: {resource_name}")
+                print(f"[NAO ENCONTRADO] {resource_name}")
         else:
             # No modo real, deletamos
-            resp = requests.delete(url, headers=HEADERS, verify=VERIFY_SSL) # <--- SSL OFF
+            resp = requests.delete(url, headers=HEADERS, verify=VERIFY_SSL)
             if resp.status_code == 200:
-                print(f"✅ DELETADO: {resource_name}")
+                print(f"[DELETADO] {resource_name}")
             elif resp.status_code == 404:
-                print(f"ℹ️ Já não existe: {resource_name}")
+                print(f"[INFO] Ja nao existe: {resource_name}")
             else:
-                print(f"❌ Erro ao deletar {resource_name}: {resp.text}")
+                print(f"[ERRO] Falha ao deletar {resource_name}: {resp.text}")
     except Exception as e:
-        print(f"❌ Erro de conexão ao tentar acessar {resource_name}: {str(e)}")
+        print(f"[ERRO CRITICO] Conexao falhou para {resource_name}: {str(e)}")
 
 # 1. Buscar e Deletar Dashboards
 dash_types = ["golden", "detalhes", "rum"]
@@ -59,9 +59,9 @@ for dtype in dash_types:
     delete_resource(f"{GRAFANA_URL}/api/dashboards/uid/{uid}", f"Dashboard ({uid})")
 
 # 2. Buscar e Deletar Pasta de Alertas
-search_query = f"Alertas Automáticos (CI/CD) - {SERVICE_NAME}"
+search_query = f"Alertas Automaticos (CI/CD) - {SERVICE_NAME}"
 try:
-    resp = requests.get(f"{GRAFANA_URL}/api/search?query={search_query}&type=dash-folder", headers=HEADERS, verify=VERIFY_SSL) # <--- SSL OFF
+    resp = requests.get(f"{GRAFANA_URL}/api/search?query={search_query}&type=dash-folder", headers=HEADERS, verify=VERIFY_SSL)
 
     if resp.status_code == 200 and len(resp.json()) > 0:
         folder = resp.json()[0]
@@ -70,8 +70,8 @@ try:
         url = f"{GRAFANA_URL}/api/folders/{folder_uid}?force=true"
         delete_resource(url, f"Pasta de Alertas ({folder['title']})")
     else:
-        print("⚪ Nenhuma pasta de alertas encontrada.")
+        print("[INFO] Nenhuma pasta de alertas encontrada.")
 except Exception as e:
-    print(f"❌ Erro ao buscar pasta de alertas: {str(e)}")
+    print(f"[ERRO] Falha ao buscar pasta de alertas: {str(e)}")
 
 print(f"--- {mode_str} Fim ---")
