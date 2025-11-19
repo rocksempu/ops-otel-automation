@@ -38,17 +38,19 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     condition = "C"
     for       = "2m"
 
-    # --- NOVO: Labels para Roteamento ---
-    # Isso permite que a Notification Policy saiba para quem mandar
+    # Labels para Roteamento
     labels = {
       "service_name" = var.service_name
       "owner"        = var.service_owner
     }
-    # ------------------------------------
 
+    # Query A
     data {
       ref_id = "A"
-      relative_time_range { from = 600; to = 0 }
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
       datasource_uid = data.grafana_data_source.prometheus.uid
       model = jsonencode({
         expr          = "sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\"}[5m])) * 100"
@@ -58,9 +60,13 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
+    # Query B
     data {
       ref_id = "B"
-      relative_time_range { from = 600; to = 0 }
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "A"
@@ -70,9 +76,13 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
+    # Query C
     data {
       ref_id = "C"
-      relative_time_range { from = 600; to = 0 }
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "B"
@@ -84,18 +94,13 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   }
 }
 
-# 4. --- NOVO: Roteamento de Notificação ---
-# CUIDADO: Em produção, isso deve ser gerenciado em um repo central.
-# Aqui, estamos definindo a política raiz para a POC.
+# 4. Roteamento de Notificação
 resource "grafana_notification_policy" "route_policy" {
   count = local.should_create
 
-  # Se nenhum filtro der match, manda para o email da squad (Fallback)
   contact_point = grafana_contact_point.squad_email[0].name
-  
   group_by      = ["alertname", "service_name"]
 
-  # Rota Específica: Se o alerta tiver a label service_name igual a este serviço
   policy {
     contact_point = grafana_contact_point.squad_email[0].name
     
