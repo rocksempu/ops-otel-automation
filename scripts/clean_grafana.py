@@ -30,7 +30,7 @@ HEADERS = {
 mode_str = "[SIMULACAO]" if DRY_RUN else "[EXECUCAO]"
 print(f"--- {mode_str} Limpeza para o servico: {SERVICE_NAME} ---")
 
-# Função auxiliar genérica
+# Função auxiliar genérica para delete simples
 def delete_resource(url, resource_name):
     try:
         if DRY_RUN:
@@ -41,7 +41,7 @@ def delete_resource(url, resource_name):
                 print(f"[NAO ENCONTRADO] {resource_name}")
         else:
             resp = requests.delete(url, headers=HEADERS, verify=VERIFY_SSL)
-            if resp.status_code == 200 or resp.status_code == 202:
+            if resp.status_code == 204 or resp.status_code == 200:
                 print(f"[DELETADO] {resource_name}")
             elif resp.status_code == 404:
                 print(f"[INFO] Ja nao existe: {resource_name}")
@@ -50,27 +50,43 @@ def delete_resource(url, resource_name):
     except Exception as e:
         print(f"[ERRO CRITICO] Conexao falhou para {resource_name}: {str(e)}")
 
-# Função específica para limpar regras de alerta dentro da pasta
-def delete_alert_rules(folder_uid):
-    # Na API do Grafana Ruler, o "Namespace" das regras geralmente é o UID da pasta
-    ruler_url = f"{GRAFANA_URL}/api/ruler/grafana/api/v1/rules/{folder_uid}"
+# Função BLINDADA para deletar regras provisionadas
+def delete_provisioned_rules(folder_uid):
+    # 1. Listar TODAS as regras provisionadas
+    list_url = f"{GRAFANA_URL}/api/v1/provisioning/alert-rules"
     
     try:
-        if DRY_RUN:
-            check = requests.get(ruler_url, headers=HEADERS, verify=VERIFY_SSL)
-            if check.status_code == 200 and len(check.json()) > 0:
-                print(f"[ENCONTRADO] Regras de Alerta na pasta {folder_uid} (Seriam deletadas)")
-        else:
-            # Tenta deletar o namespace de regras inteiro
-            resp = requests.delete(ruler_url, headers=HEADERS, verify=VERIFY_SSL)
-            if resp.status_code == 202 or resp.status_code == 200:
-                print(f"[LIMPEZA] Regras de Alerta removidas da pasta {folder_uid}")
-            elif resp.status_code == 404:
-                print(f"[INFO] Nenhuma regra encontrada para limpar na pasta {folder_uid}")
+        resp = requests.get(list_url, headers=HEADERS, verify=VERIFY_SSL)
+        if resp.status_code != 200:
+            print(f"[ERRO] Nao foi possivel listar regras: {resp.text}")
+            return
+
+        all_rules = resp.json()
+        
+        # 2. Filtrar regras que estao NESTA pasta
+        rules_in_folder = [r for r in all_rules if r.get('folderUid') == folder_uid]
+        
+        if len(rules_in_folder) == 0:
+            print(f"[INFO] Nenhuma regra encontrada dentro da pasta {folder_uid}")
+            return
+
+        # 3. Deletar uma por uma usando a API de Provisionamento (que ignora a trava)
+        for rule in rules_in_folder:
+            rule_uid = rule['uid']
+            rule_title = rule['title']
+            del_url = f"{GRAFANA_URL}/api/v1/provisioning/alert-rules/{rule_uid}"
+
+            if DRY_RUN:
+                print(f"[ENCONTRADO] Regra Provisionada '{rule_title}' (Seria deletada)")
             else:
-                print(f"[AVISO] Nao foi possivel limpar regras via Ruler API: {resp.text}")
+                del_resp = requests.delete(del_url, headers=HEADERS, verify=VERIFY_SSL)
+                if del_resp.status_code == 204:
+                    print(f"[DELETADO] Regra Provisionada: {rule_title}")
+                else:
+                    print(f"[ERRO] Falha ao deletar regra {rule_title}: {del_resp.text}")
+
     except Exception as e:
-        print(f"[ERRO] Falha ao limpar regras de alerta: {str(e)}")
+        print(f"[ERRO] Falha na logica de regras provisionadas: {str(e)}")
 
 # ---------------------------------------------------------
 # 1. Buscar e Deletar Dashboards
@@ -83,7 +99,6 @@ for dtype in dash_types:
 # ---------------------------------------------------------
 # 2. Buscar e Deletar Pasta de Alertas (e suas regras)
 # ---------------------------------------------------------
-# Tentamos com e sem acento para garantir
 search_queries = [
     f"Alertas Automáticos (CI/CD) - {SERVICE_NAME}",
     f"Alertas Automaticos (CI/CD) - {SERVICE_NAME}"
@@ -102,10 +117,10 @@ for query in search_queries:
             folder_uid = folder['uid']
             folder_found = True
             
-            # PASSO CRÍTICO: Deletar as regras antes da pasta
-            delete_alert_rules(folder_uid)
+            # PASSO CRÍTICO: Usar a nova função de Provisionamento
+            delete_provisioned_rules(folder_uid)
             
-            # Agora deleta a pasta
+            # Agora deleta a pasta vazia
             url = f"{GRAFANA_URL}/api/folders/{folder_uid}"
             delete_resource(url, f"Pasta de Alertas ({folder['title']})")
             
