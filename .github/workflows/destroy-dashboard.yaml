@@ -3,12 +3,10 @@ name: Decommission (Simples)
 on:
   workflow_dispatch:
     inputs:
-      # --- DADOS DE DISCOVERY (O usuário pega no Grafana) ---
       service_name:
         description: 'Nome do Serviço (Veja no Título do Dashboard)'
         required: true
       
-      # --- O BOTÃO DE SEGURANÇA ---
       action_type:
         type: choice
         description: 'O que você quer fazer?'
@@ -27,21 +25,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      # Instalação do Requests usando o caminho completo do Python
       - name: Instalar Python Requests
-        run: python -m pip install requests
+        run: '& "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe" -m pip install requests'
 
       # PASSO 1: MODO SIMULAÇÃO (Dry Run)
-      # Mostra o que seria apagado, mas não apaga.
       - name: Simular Limpeza (Dry Run)
         if: ${{ inputs.action_type == '🔍 APENAS SIMULAR (Dry Run)' }}
         env:
           GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          python scripts/clean_grafana.py "${{ inputs.service_name }}" --dry-run
+          & "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe" scripts/clean_grafana.py "${{ inputs.service_name }}" --dry-run
 
       # PASSO 2: MODO DESTRUIÇÃO (Execute)
-      # Apaga de verdade.
       - name: Executar Limpeza Real
         if: ${{ inputs.action_type == '💥 DESTRUIR DE VERDADE (Execute)' }}
         env:
@@ -49,4 +46,4 @@ jobs:
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
         run: |
           Write-Host "⚠️ INICIANDO PROCESSO DE DESTRUIÇÃO..."
-          python scripts/clean_grafana.py "${{ inputs.service_name }}"
+          & "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe" scripts/clean_grafana.py "${{ inputs.service_name }}"
