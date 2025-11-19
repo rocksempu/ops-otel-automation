@@ -31,6 +31,13 @@ on:
         description: 'Versão (SemVer)'
         default: '1.0.0'
         required: false
+      
+      # Novo Input: Controle de Alertas (Policy as Code)
+      enable_alerts:
+        description: 'Ativar Alertas? (Em PRD será sempre Ativado)'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   deploy-dashboard:
@@ -61,4 +68,5 @@ jobs:
             -var="service_namespace=${{ inputs.service_namespace }}" `
             -var="service_owner=${{ inputs.service_owner }}" `
             -var="service_version=${{ inputs.service_version }}" `
-            -var="environment=${{ inputs.environment }}"
+            -var="environment=${{ inputs.environment }}" `
+            -var="enable_alerts=${{ inputs.enable_alerts }}"

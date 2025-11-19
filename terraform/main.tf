@@ -7,21 +7,10 @@ terraform {
   }
 }
 
-# Variáveis de Conexão (Vêm das Secrets)
-variable "grafana_url" {}
-variable "grafana_auth" {}
-
-# Variáveis do Formulário (Inputs do GitHub Actions)
-variable "template_type" {}
-variable "service_name" {}
-variable "service_namespace" {}
-variable "service_version" { default = "1.0.0" }
-variable "environment" {}
-variable "service_owner" {}
-
 provider "grafana" {
-  url  = var.grafana_url
-  auth = var.grafana_auth
+  url                  = var.grafana_url
+  auth                 = var.grafana_auth
+  # Importante para o seu Lab no Fyre:
   insecure_skip_verify = true
 }
 
