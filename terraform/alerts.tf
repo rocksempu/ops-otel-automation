@@ -1,25 +1,21 @@
 # Lógica de Governança (Policy as Code)
-# Regra: Em 'prd', alertas são obrigatórios (ignora a flag).
-#        Em outros ambientes, respeita a escolha do usuário (var.enable_alerts).
 locals {
   should_create = var.environment == "prd" || var.enable_alerts ? 1 : 0
 }
 
-# 1. Pasta para os Alertas (Criada apenas se a lógica permitir)
+# 1. Pasta para os Alertas
 resource "grafana_folder" "alerts_folder" {
   count = local.should_create
-
   title = "Alertas Automáticos (CI/CD) - ${var.service_name}"
 }
 
 # 2. Ponto de Contato (Email da Squad)
 resource "grafana_contact_point" "squad_email" {
   count = local.should_create
-
-  name = "${var.service_owner}-email"
+  name  = "${var.service_owner}-email"
 
   email {
-    addresses = ["${var.service_owner}"] # O input 'service_owner' deve ser um email válido
+    addresses = ["${var.service_owner}"]
     message   = "Alerta Crítico - Serviço: {{ service_name }} [${var.environment}]"
   }
 }
@@ -29,15 +25,14 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   count = local.should_create
 
   name             = "Alertas - ${var.service_name}"
-  # Nota: O [0] é necessário porque agora o recurso 'grafana_folder' usa 'count'
-  folder_uid       = grafana_folder.alerts_folder[0].uid 
+  folder_uid       = grafana_folder.alerts_folder[0].uid
   interval_seconds = 60
-  org_id           = 1
+  # org_id = 1  <-- LINHA REMOVIDA (O erro estava aqui)
 
   rule {
     name      = "High Error Rate - ${var.service_name}"
-    condition = "C" # Dispara se a condição C for verdadeira
-    for       = "2m" # Janela de tempo
+    condition = "C"
+    for       = "2m"
 
     # Query A: Pega a taxa de erro do Prometheus
     data {
@@ -46,7 +41,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
         from = 600
         to   = 0
       }
-      datasource_uid = "Prometheus" 
+      datasource_uid = "Prometheus"
       model = jsonencode({
         expr          = "sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\"}[5m])) * 100"
         intervalMs    = 1000
@@ -55,7 +50,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
-    # Query B: Reduz para a média (Reduce)
+    # Query B: Reduz para a média
     data {
       ref_id = "B"
       relative_time_range {
@@ -71,7 +66,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
-    # Query C: Limiar (Threshold > 5%)
+    # Query C: Threshold (> 5%)
     data {
       ref_id = "C"
       relative_time_range {
@@ -85,7 +80,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
         refId      = "C"
         conditions = [
           {
-            evaluator = { params = [5], type = "gt" } # Maior que 5%
+            evaluator = { params = [5], type = "gt" }
           }
         ]
       })
