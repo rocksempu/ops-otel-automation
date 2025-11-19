@@ -15,12 +15,12 @@ Este projeto implementa uma esteira de **Observability as Code**. O objetivo é 
 
 ## 🚀 Guia de Uso (Lifecycle Management)
 
-Toda a interação é feita via **GitHub Actions**. Não altere recursos manualmente no Grafana.
+Toda a interação é feita via **GitHub Actions**.
 
 ### 1️⃣ Como Criar (Onboarding)
 Para criar monitoria para um novo serviço:
 
-1.  Acesse a aba **[Actions](../../actions)**.
+1.  Acesse a aba **[Actions](../../actions)** deste repositório.
 2.  Selecione o workflow **"Criar Dashboard (Self-Service)"**.
 3.  Clique em **Run workflow**.
 4.  Preencha os campos obrigatórios:
@@ -32,24 +32,43 @@ Para criar monitoria para um novo serviço:
     * **Ativar Alertas?**: Define se os alertas serão criados (Obrigatório em PRD).
 5.  Clique no botão verde **Run workflow**.
 
+✅ **Pronto!** Em menos de 1 minuto, seu dashboard estará na pasta `Dashboards Automáticos (CI/CD)` e seus alertas na área de `Alerting` do Grafana.
+
+---
+
 ### 2️⃣ Como Remover (Decommission)
 Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente:
 
 1.  Acesse a aba **[Actions](../../actions)**.
-2.  Selecione o workflow **"Decommission (Via API)"**.
+2.  Selecione o workflow **"Decommission (Simples)"**.
 3.  Clique em **Run workflow**.
 4.  Preencha os campos:
-    * **Service Name:** O nome exato do serviço que deseja remover (ex: `pix-api`).
-    * **Confirmação:** Digite `DELETE` para autorizar.
-5.  O sistema fará a limpeza automática via API.
+    * **Service Name:** O nome exato do serviço (Você pode encontrar no título do Dashboard no Grafana).
+    * **Ação:**
+        * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run).
+        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão dos recursos.
+5.  Clique no botão verde **Run workflow**.
 
 ---
 
 ## ⚠️ Aviso Importante sobre Drift
 
-> **NUNCA delete Dashboards ou Alertas manualmente pela interface do Grafana.**
+> **⛔ NUNCA delete Dashboards ou Alertas manualmente pela interface do Grafana.**
 
-Esta plataforma utiliza o conceito de **Infrastructure as Code**. O código é a "fonte da verdade". Se você deletar um recurso manualmente, a pipeline pode falhar na próxima execução ou recriar o recurso inesperadamente. Utilize sempre o workflow de **Decommission**.
+Esta plataforma utiliza o conceito de **Infrastructure as Code**. O código e a automação são a "fonte da verdade".
+* Se você deletar um recurso manualmente, a pipeline pode falhar na próxima execução ou recriar o recurso inesperadamente (Drift de Configuração).
+* Se precisar remover algo, utilize sempre o workflow de **Decommission** descrito acima.
+
+---
+
+## 👮 Política de Governança (Policy as Code)
+
+A pipeline aplica regras automáticas baseadas no ambiente selecionado:
+
+| Ambiente | Regra de Alertas | Comportamento |
+| :--- | :--- | :--- |
+| **PRD (Produção)** | 🚨 **Obrigatório** | O sistema **ignora** o checkbox e força a criação dos alertas de erro e latência. Produção não pode ficar sem monitoria. |
+| **DEV / HML** | 🔓 **Opcional** | O sistema respeita a sua escolha no checkbox `Ativar Alertas`. Útil para evitar ruído em ambientes de teste. |
 
 ---
 
@@ -70,15 +89,13 @@ Atualmente suportamos os seguintes modelos (BTM-First):
 ### Estado do Terraform (State Management)
 Nesta versão **MVP**, o arquivo de estado do Terraform (`terraform.tfstate`) é gerenciado **localmente** no Runner (Ephemeral).
 
-* **Implicação:** O Terraform "esquece" o estado anterior entre as execuções.
-* **Solução de Contorno:** Para o processo de *Decommission* (Destruição), utilizamos um script Python auxiliar que interage diretamente com a API do Grafana, garantindo a limpeza dos recursos baseada no nome do serviço, independente do estado do Terraform.
+* **Implicação:** O Terraform não mantém histórico persistente entre execuções de diferentes serviços.
+* **Solução de Decommission:** Para garantir a destruição confiável de qualquer serviço a qualquer momento, o workflow de *Decommission* utiliza um script auxiliar (Python) que interage diretamente com a API do Grafana, localizando e removendo recursos baseados no `Service Name`. Isso garante a limpeza mesmo sem o estado local do Terraform.
 
 ### 🔮 Roadmap (Próximos Passos)
 Para evoluir esta solução para um cenário **Enterprise/Produção**, recomenda-se:
 
-1.  **Remote Backend:** Migrar o armazenamento do `tfstate` para um object storage centralizado (AWS S3, Azure Blob Storage ou Terraform Cloud). Isso permitirá:
-    * Concorrência segura (State Locking).
-    * Uso nativo do comando `terraform destroy` sem scripts auxiliares.
+1.  **Remote Backend:** Migrar o armazenamento do `tfstate` para um object storage centralizado (AWS S3, Azure Blob Storage ou Terraform Cloud). Isso permitirá o uso nativo do comando `terraform destroy` com state locking.
 2.  **Notification Policies:** Centralizar a árvore de roteamento de alertas em um repositório dedicado para evitar sobrescrita por múltiplos serviços.
 
 ---

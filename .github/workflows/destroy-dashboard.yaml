@@ -7,26 +7,15 @@ on:
       service_name:
         description: 'Nome do Serviço (Veja no Título do Dashboard)'
         required: true
-      service_namespace:
-        description: 'Namespace (Veja nas Tags)'
-        required: true
-      service_owner:
-        description: 'Owner (Veja nas Tags)'
-        required: true
-      environment:
-        type: choice
-        description: 'Ambiente'
-        options: [dev, hml, prd]
-        required: true
       
       # --- O BOTÃO DE SEGURANÇA ---
       action_type:
         type: choice
         description: 'O que você quer fazer?'
         options:
-        - '🔍 APENAS SIMULAR (Terraform Plan)'
-        - '💥 DESTRUIR DE VERDADE (Terraform Destroy)'
-        default: '🔍 APENAS SIMULAR (Terraform Plan)'
+        - '🔍 APENAS SIMULAR (Dry Run)'
+        - '💥 DESTRUIR DE VERDADE (Execute)'
+        default: '🔍 APENAS SIMULAR (Dry Run)'
         required: true
 
 jobs:
@@ -38,41 +27,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Terraform Init
-        working-directory: ./terraform
-        run: '& "C:\Terraform\terraform.exe" init'
+      - name: Instalar Python Requests
+        run: pip install requests
 
-      # PASSO 1: SEMPRE MOSTRA O PLANO (Para o usuário conferir)
-      - name: Mostrar o que será feito (Plan)
-        working-directory: ./terraform
+      # PASSO 1: MODO SIMULAÇÃO (Dry Run)
+      # Mostra o que seria apagado, mas não apaga.
+      - name: Simular Limpeza (Dry Run)
+        if: ${{ inputs.action_type == '🔍 APENAS SIMULAR (Dry Run)' }}
         env:
-          TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
-          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          & "C:\Terraform\terraform.exe" plan -destroy `
-            -var="template_type=goldensignals" `
-            -var="service_name=${{ inputs.service_name }}" `
-            -var="service_namespace=${{ inputs.service_namespace }}" `
-            -var="service_owner=${{ inputs.service_owner }}" `
-            -var="service_version=0.0.0" `
-            -var="environment=${{ inputs.environment }}" `
-            -var="enable_alerts=true"
+          python scripts/clean_grafana.py "${{ inputs.service_name }}" --dry-run
 
-      # PASSO 2: SÓ DESTROI SE O USUÁRIO ESCOLHEU A OPÇÃO DE DESTRUIR
-      - name: Executar Destruição (Destroy)
-        # Essa é a trava lógica simples que você pediu
-        if: ${{ inputs.action_type == '💥 DESTRUIR DE VERDADE (Terraform Destroy)' }}
-        working-directory: ./terraform
+      # PASSO 2: MODO DESTRUIÇÃO (Execute)
+      # Apaga de verdade.
+      - name: Executar Limpeza Real
+        if: ${{ inputs.action_type == '💥 DESTRUIR DE VERDADE (Execute)' }}
         env:
-          TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
-          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
+          GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          Write-Host "INICIANDO DESTRUIÇÃO DOS RECURSOS..."
-          & "C:\Terraform\terraform.exe" destroy -auto-approve `
-            -var="template_type=goldensignals" `
-            -var="service_name=${{ inputs.service_name }}" `
-            -var="service_namespace=${{ inputs.service_namespace }}" `
-            -var="service_owner=${{ inputs.service_owner }}" `
-            -var="service_version=0.0.0" `
-            -var="environment=${{ inputs.environment }}" `
-            -var="enable_alerts=true"
+          Write-Host "⚠️ INICIANDO PROCESSO DE DESTRUIÇÃO..."
+          python scripts/clean_grafana.py "${{ inputs.service_name }}"
