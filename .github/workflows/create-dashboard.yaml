@@ -34,7 +34,7 @@ on:
 
 jobs:
   deploy-dashboard:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     name: "Criar: ${{ inputs.template_type }} para ${{ inputs.service_name }}"
     
     steps:
