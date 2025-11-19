@@ -59,16 +59,27 @@ for dtype in dash_types:
     delete_resource(f"{GRAFANA_URL}/api/dashboards/uid/{uid}", f"Dashboard ({uid})")
 
 # 2. Buscar e Deletar Pasta de Alertas
-search_query = f"Alertas Automaticos (CI/CD) - {SERVICE_NAME}"
+# AQUI ESTAVA O ERRO: Adicionamos o acento de volta para bater com o Terraform
+search_query = f"Alertas Automáticos (CI/CD) - {SERVICE_NAME}"
+
 try:
     resp = requests.get(f"{GRAFANA_URL}/api/search?query={search_query}&type=dash-folder", headers=HEADERS, verify=VERIFY_SSL)
 
     if resp.status_code == 200 and len(resp.json()) > 0:
         folder = resp.json()[0]
         folder_uid = folder['uid']
+        folder_title = folder['title']
+        
         # URL especial com force=true para apagar regras dentro
         url = f"{GRAFANA_URL}/api/folders/{folder_uid}?force=true"
-        delete_resource(url, f"Pasta de Alertas ({folder['title']})")
+        
+        # Tratamento para evitar erro de acento no print do Windows
+        try:
+            print_name = f"Pasta de Alertas ({folder_title})"
+        except:
+            print_name = f"Pasta de Alertas (UID: {folder_uid})"
+
+        delete_resource(url, print_name)
     else:
         print("[INFO] Nenhuma pasta de alertas encontrada.")
 except Exception as e:
