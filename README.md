@@ -15,7 +15,7 @@ Este projeto implementa uma esteira de **Observability as Code**. O objetivo é 
 
 ## 🚀 Guia de Uso (Lifecycle Management)
 
-Toda a interação é feita via **GitHub Actions**.
+Toda a interação é feita via **GitHub Actions**. Não altere recursos manualmente no Grafana.
 
 ### 1️⃣ Como Criar (Onboarding)
 Para criar monitoria para um novo serviço:
@@ -37,16 +37,18 @@ Para criar monitoria para um novo serviço:
 ---
 
 ### 2️⃣ Como Remover (Decommission)
-Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente:
+Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente.
+
+> **Dica:** Você só precisa saber o **Nome do Serviço**. Olhe o título do Dashboard no Grafana (ex: `Golden Signals - pix-api [dev]` -> O nome é `pix-api`).
 
 1.  Acesse a aba **[Actions](../../actions)**.
 2.  Selecione o workflow **"Decommission (Simples)"**.
 3.  Clique em **Run workflow**.
 4.  Preencha os campos:
-    * **Service Name:** O nome exato do serviço (Você pode encontrar no título do Dashboard no Grafana).
-    * **Ação:**
-        * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run).
-        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão dos recursos.
+    * **Service Name:** O nome exato do serviço (ex: `pix-api`).
+    * **Ação (Segurança):**
+        * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run). **Recomendado rodar este primeiro.**
+        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão definitiva dos recursos.
 5.  Clique no botão verde **Run workflow**.
 
 ---
