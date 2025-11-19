@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Instalar Python Requests
-        run: pip install requests
+        run: python -m pip install requests
 
       # PASSO 1: MODO SIMULAÇÃO (Dry Run)
       # Mostra o que seria apagado, mas não apaga.
