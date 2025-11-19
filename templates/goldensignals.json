@@ -13,35 +13,143 @@
   "refresh": "30s",
   "panels": [
     {
-      "title": "Taxa de Erros (Error Rate)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Detalhes do Serviço",
+      "type": "table",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "marcusolsson-json-datasource", "uid": "JSON API" },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\"}[5m]))",
-          "legendFormat": "Error Rate %"
+          "refId": "A",
+          "datasource": { "type": "marcusolsson-json-datasource", "uid": "JSON API" },
+          "method": "GET",
+          "urlPath": "/metadata_api",
+          "fields": [{ "jsonPath": "$.rows[*]" }]
+        }
+      ],
+      "transformations": [
+        { "id": "extractFields", "options": { "format": "json", "replace": true, "source": "*" } },
+        { "id": "limit", "options": { "limitField": "6" } }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Status Geral",
+      "type": "grafana-polystat-panel",
+      "gridPos": { "h": 12, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(6, service_status{service_name=\"${service_name}\"})",
+          "legendFormat": "{{exported_service}}"
         }
       ]
     },
     {
-      "title": "Latência p95",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Tráfego (RPS)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{service_name=\"${service_name}\"}[5m]) by (le)))",
-          "legendFormat": "p95"
+          "refId": "A",
+          "expr": "avg(app_traffic_rps{service_name=\"${service_name}\"})"
         }
       ]
     },
     {
-      "title": "Throughput (RPS)",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 1,
+      "title": "Latência Média (ms)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 3 },
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\"}[5m]))",
-          "legendFormat": "RPS"
+          "refId": "A",
+          "expr": "avg(app_latency_ms{service_name=\"${service_name}\"})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Taxa de Erros (%)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(app_error_rate{service_name=\"${service_name}\"})"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Latência no Tempo",
+      "type": "timeseries",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(app_latency_ms{service_name=\"${service_name}\"})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Saturação (%)",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(app_saturation_percent{service_name=\"${service_name}\"})"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Logs de Erro Recentes",
+      "type": "table",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "marcusolsson-json-datasource", "uid": "JSON API" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "marcusolsson-json-datasource", "uid": "JSON API" },
+          "method": "GET",
+          "urlPath": "/logs_table",
+          "fields": [{ "jsonPath": "$.rows[*]" }]
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [{ "fieldName": "*", "config": { "id": "regex", "options": { "value": "\\bERROR\\b" } } }],
+            "type": "include",
+            "match": "any"
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Traces Recentes (Tempo)",
+      "type": "table",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "tempo", "uid": "Tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "Tempo" },
+          "queryType": "traceql",
+          "query": "{ resource.service.name=\"${service_name}\" }",
+          "limit": 20,
+          "tableType": "traces"
         }
       ]
     }
