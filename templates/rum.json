@@ -1,0 +1,29 @@
+{
+  "title": "RUM Experience - ${service_name} [${environment}]",
+  "uid": "${service_name}-rum",
+  "tags": ["${service_namespace}", "frontend", "ux"],
+  "panels": [
+    {
+      "title": "LCP (Largest Contentful Paint)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "avg(rum_lcp_ms{service_name=\"${service_name}\"})",
+          "legendFormat": "LCP (ms)"
+        }
+      ]
+    },
+    {
+      "title": "CLS (Cumulative Layout Shift)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "avg(rum_cls{service_name=\"${service_name}\"})",
+          "legendFormat": "CLS Score"
+        }
+      ]
+    }
+  ]
+}

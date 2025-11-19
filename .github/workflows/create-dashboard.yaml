@@ -1,0 +1,63 @@
+name: Criar Dashboard (Self-Service)
+
+on:
+  workflow_dispatch:
+    inputs:
+      template_type:
+        type: choice
+        description: 'Modelo de Dashboard'
+        options:
+        - goldensignals
+        - detalhesporservico
+        - rum
+        required: true
+      
+      # Inputs de Governança Obrigatória (Conforme MVP)
+      service_name:
+        description: 'Nome do Serviço (Ex: ibpf-api)'
+        required: true
+      service_namespace:
+        description: 'Namespace (Ex: pix, crm)'
+        required: true
+      service_owner:
+        description: 'Owner (Squad/Email)'
+        required: true
+      environment:
+        type: choice
+        description: 'Ambiente'
+        options: [dev, hml, prd]
+        required: true
+      service_version:
+        description: 'Versão (SemVer)'
+        default: '1.0.0'
+        required: false
+
+jobs:
+  deploy-dashboard:
+    runs-on: ubuntu-latest
+    name: "Criar: ${{ inputs.template_type }} para ${{ inputs.service_name }}"
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        env:
+          TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
+          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
+        run: |
+          terraform apply -auto-approve \
+            -var="template_type=${{ inputs.template_type }}" \
+            -var="service_name=${{ inputs.service_name }}" \
+            -var="service_namespace=${{ inputs.service_namespace }}" \
+            -var="service_owner=${{ inputs.service_owner }}" \
+            -var="service_version=${{ inputs.service_version }}" \
+            -var="environment=${{ inputs.environment }}"

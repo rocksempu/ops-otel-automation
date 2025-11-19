@@ -1,0 +1,49 @@
+{
+  "title": "Golden Signals - ${service_name} [${environment}]",
+  "uid": "${service_name}-golden",
+  "tags": [
+    "${service_namespace}",
+    "${service_owner}",
+    "${environment}",
+    "generated-by-pipeline"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 30,
+  "version": 0,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "Taxa de Erros (Error Rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\"}[5m]))",
+          "legendFormat": "Error Rate %"
+        }
+      ]
+    },
+    {
+      "title": "Latência p95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{service_name=\"${service_name}\"}[5m]) by (le)))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "title": "Throughput (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{service_name=\"${service_name}\"}[5m]))",
+          "legendFormat": "RPS"
+        }
+      ]
+    }
+  ]
+}

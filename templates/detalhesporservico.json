@@ -1,0 +1,29 @@
+{
+  "title": "Infra Detalhada - ${service_name} [${environment}]",
+  "uid": "${service_name}-detalhes",
+  "tags": ["${service_namespace}", "infra", "k8s"],
+  "panels": [
+    {
+      "title": "Uso de CPU",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"${service_name}-.*\"}[5m]))",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "title": "Uso de Memória",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{pod=~\"${service_name}-.*\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    }
+  ]
+}
