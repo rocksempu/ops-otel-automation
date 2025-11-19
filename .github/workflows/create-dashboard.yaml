@@ -41,26 +41,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # --- BLOCO COMENTADO PARA USAR TERRAFORM LOCAL (WINDOWS) ---
-      # - name: Setup Terraform
-      #   uses: hashicorp/setup-terraform@v2
-      #   with:
-      #     terraform_wrapper: false
+      # Setup removido para usar instalação manual local e evitar erro de wrapper
 
       - name: Terraform Init
         working-directory: ./terraform
-        run: terraform init
+        # O & comercial é obrigatório no PowerShell para rodar executáveis com caminho entre aspas
+        run: '& "C:\Terraform\terraform.exe" init'
 
       - name: Terraform Apply
         working-directory: ./terraform
         env:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
+        # Nota: No PowerShell, a quebra de linha é feita com CRASE (`), não barra invertida (\)
         run: |
-          terraform apply -auto-approve \
-            -var="template_type=${{ inputs.template_type }}" \
-            -var="service_name=${{ inputs.service_name }}" \
-            -var="service_namespace=${{ inputs.service_namespace }}" \
-            -var="service_owner=${{ inputs.service_owner }}" \
-            -var="service_version=${{ inputs.service_version }}" \
+          & "C:\Terraform\terraform.exe" apply -auto-approve `
+            -var="template_type=${{ inputs.template_type }}" `
+            -var="service_name=${{ inputs.service_name }}" `
+            -var="service_namespace=${{ inputs.service_namespace }}" `
+            -var="service_owner=${{ inputs.service_owner }}" `
+            -var="service_version=${{ inputs.service_version }}" `
             -var="environment=${{ inputs.environment }}"
