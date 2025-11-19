@@ -41,7 +41,7 @@ Para remover dashboards e alertas de um serviço descontinuado ou criado erronea
 4.  Preencha os campos:
     * **Service Name:** O nome exato do serviço que deseja remover (ex: `pix-api`).
     * **Confirmação:** Digite `DELETE` para autorizar.
-5.  O sistema fará a limpeza automática de Dashboards e Pastas de Alerta vinculados a este serviço.
+5.  O sistema fará a limpeza automática via API.
 
 ---
 
@@ -49,20 +49,7 @@ Para remover dashboards e alertas de um serviço descontinuado ou criado erronea
 
 > **NUNCA delete Dashboards ou Alertas manualmente pela interface do Grafana.**
 
-Esta plataforma utiliza o conceito de **Infrastructure as Code**. O código (Terraform/Pipeline) é a "fonte da verdade".
-* Se você deletar um recurso manualmente, a pipeline pode falhar na próxima execução ou recriar o recurso inesperadamente.
-* Se precisar remover algo, utilize sempre o workflow de **Decommission**.
-
----
-
-## 👮 Política de Governança (Policy as Code)
-
-A pipeline aplica regras automáticas baseadas no ambiente selecionado:
-
-| Ambiente | Regra de Alertas | Comportamento |
-| :--- | :--- | :--- |
-| **PRD (Produção)** | 🚨 **Obrigatório** | O sistema **ignora** o checkbox e força a criação dos alertas de erro e latência. Produção não pode ficar sem monitoria. |
-| **DEV / HML** | 🔓 **Opcional** | O sistema respeita a sua escolha no checkbox `Ativar Alertas`. Útil para evitar ruído em ambientes de teste. |
+Esta plataforma utiliza o conceito de **Infrastructure as Code**. O código é a "fonte da verdade". Se você deletar um recurso manualmente, a pipeline pode falhar na próxima execução ou recriar o recurso inesperadamente. Utilize sempre o workflow de **Decommission**.
 
 ---
 
@@ -75,6 +62,24 @@ Atualmente suportamos os seguintes modelos (BTM-First):
 | **Golden Signals** | Backend | Monitoramento de Latência, Erro, Tráfego e Saturação. |
 | **Detalhes do Serviço** | Infra | Uso de CPU, Memória, Status de Pods e SLI x SLO. |
 | **RUM (Web Vitals)** | Frontend | Experiência do usuário (LCP, CLS, INP) e performance por browser. |
+
+---
+
+## 🏗️ Considerações de Arquitetura (MVP vs Produção)
+
+### Estado do Terraform (State Management)
+Nesta versão **MVP**, o arquivo de estado do Terraform (`terraform.tfstate`) é gerenciado **localmente** no Runner (Ephemeral).
+
+* **Implicação:** O Terraform "esquece" o estado anterior entre as execuções.
+* **Solução de Contorno:** Para o processo de *Decommission* (Destruição), utilizamos um script Python auxiliar que interage diretamente com a API do Grafana, garantindo a limpeza dos recursos baseada no nome do serviço, independente do estado do Terraform.
+
+### 🔮 Roadmap (Próximos Passos)
+Para evoluir esta solução para um cenário **Enterprise/Produção**, recomenda-se:
+
+1.  **Remote Backend:** Migrar o armazenamento do `tfstate` para um object storage centralizado (AWS S3, Azure Blob Storage ou Terraform Cloud). Isso permitirá:
+    * Concorrência segura (State Locking).
+    * Uso nativo do comando `terraform destroy` sem scripts auxiliares.
+2.  **Notification Policies:** Centralizar a árvore de roteamento de alertas em um repositório dedicado para evitar sobrescrita por múltiplos serviços.
 
 ---
 
