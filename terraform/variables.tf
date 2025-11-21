@@ -52,6 +52,6 @@ variable "enable_alerts" {
 variable "runbook_base_url" {
   description = "URL base onde ficam os documentos de troubleshooting"
   type        = string
-  # Aponta para o arquivo Markdown dentro do repositório principal
+  # Aponta para o arquivo Markdown dentro do repositório principal do projeto
   default     = "https://github.com/rocksempu/ops-otel-automation/blob/main/runbooks"
 }
