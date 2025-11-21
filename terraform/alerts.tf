@@ -3,12 +3,10 @@ locals {
   should_create = var.environment == "prd" || var.enable_alerts ? 1 : 0
 }
 
-# Datasource (Busca o UID do Prometheus já configurado no Grafana)
+# Datasource (Busca o UID do Prometheus)
 data "grafana_data_source" "prometheus" {
   name = "prometheus"
 }
-
-# --- NOTA: A criação da pasta foi movida para o main.tf para ser compartilhada ---
 
 # 1. Ponto de Contato (Email da Squad)
 resource "grafana_contact_point" "squad_email" {
@@ -26,8 +24,10 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   count = local.should_create
 
   name             = "Alertas - ${var.service_name}"
-  # Aponta para a pasta do projeto (definida no main.tf)
+  
+  # Aponta para a pasta UNIFICADA criada no main.tf
   folder_uid       = grafana_folder.project_folder.uid
+  
   interval_seconds = 60
 
   rule {
@@ -35,7 +35,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     condition = "C"
     for       = "2m"
 
-    # Labels para Roteamento (Notification Policy usa isso)
+    # Labels para Roteamento
     labels = {
       "service_name" = var.service_name
       "owner"        = var.service_owner
@@ -53,14 +53,20 @@ resource "grafana_rule_group" "golden_signals_alerts" {
         3. Avalie rollback se houve deploy recente.
       EOT
       
-      # Link para a documentação no Git
+      # Link para a documentação no Git (com .md)
       runbook_url = "${var.runbook_base_url}/HighErrorRate.md?service=${var.service_name}"
     }
 
     # Query A: Taxa de Erro
     data {
       ref_id = "A"
-      relative_time_range { from = 600; to = 0 }
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
+      
       datasource_uid = data.grafana_data_source.prometheus.uid
       model = jsonencode({
         expr          = "sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\"}[5m])) * 100"
@@ -73,7 +79,13 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     # Query B: Reduce (Média)
     data {
       ref_id = "B"
-      relative_time_range { from = 600; to = 0 }
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
+      
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "A"
@@ -86,7 +98,13 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     # Query C: Threshold (> 5%)
     data {
       ref_id = "C"
-      relative_time_range { from = 600; to = 0 }
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
+      relative_time_range {
+        from = 600
+        to   = 0
+      }
+      
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "B"
@@ -98,7 +116,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   }
 }
 
-# 3. Roteamento de Notificação (Liga o Alerta ao E-mail)
+# 3. Roteamento de Notificação
 resource "grafana_notification_policy" "route_policy" {
   count = local.should_create
 
