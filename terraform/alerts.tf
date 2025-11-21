@@ -38,17 +38,15 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     condition = "C"
     for       = "2m"
 
-    # Labels para Roteamento
     labels = {
       "service_name" = var.service_name
       "owner"        = var.service_owner
     }
 
-    # --- NOVO: Runbook e Instruções (Item 10 do MVP) ---
+    # --- CORREÇÃO AQUI (Adicionado .md) ---
     annotations = {
       summary = "Taxa de erro > 5% em ${var.service_name}"
       
-      # [cite_start]Instruções rápidas direto no alerta [cite: 143]
       description = <<-EOT
         O serviço está apresentando alta taxa de erros.
         Checklist de Resolução:
@@ -57,18 +55,15 @@ resource "grafana_rule_group" "golden_signals_alerts" {
         3. Avalie rollback se houve deploy recente.
       EOT
       
-      # O Link clicável para a doc completa
-      runbook_url = "${var.runbook_base_url}/HighErrorRate?service=${var.service_name}"
+      # Adicionado .md antes do ?service=
+      runbook_url = "${var.runbook_base_url}/HighErrorRate.md?service=${var.service_name}"
     }
-    # ---------------------------------------------------
+    # ---------------------------------------
 
     # Query A
     data {
       ref_id = "A"
-      relative_time_range {
-        from = 600
-        to   = 0
-      }
+      relative_time_range { from = 600; to = 0 }
       datasource_uid = data.grafana_data_source.prometheus.uid
       model = jsonencode({
         expr          = "sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\"}[5m])) * 100"
@@ -81,10 +76,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     # Query B
     data {
       ref_id = "B"
-      relative_time_range {
-        from = 600
-        to   = 0
-      }
+      relative_time_range { from = 600; to = 0 }
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "A"
@@ -97,10 +89,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
     # Query C
     data {
       ref_id = "C"
-      relative_time_range {
-        from = 600
-        to   = 0
-      }
+      relative_time_range { from = 600; to = 0 }
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "B"
@@ -112,7 +101,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   }
 }
 
-# 4. Roteamento de Notificação
+# 4. Roteamento
 resource "grafana_notification_policy" "route_policy" {
   count = local.should_create
 
@@ -121,7 +110,6 @@ resource "grafana_notification_policy" "route_policy" {
 
   policy {
     contact_point = grafana_contact_point.squad_email[0].name
-    
     matcher {
       label = "service_name"
       match = "="
