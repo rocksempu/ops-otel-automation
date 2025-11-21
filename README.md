@@ -13,9 +13,16 @@ Este projeto implementa uma esteira de **Observability as Code**. O objetivo é 
 
 ---
 
+## 🛡️ Quality Assurance (Quality Gates)
+Para garantir a integridade da plataforma, a pipeline executa validações automáticas antes de qualquer alteração:
+
+* **JSON Linting:** Todos os templates na pasta `/templates` são validados sintaticamente antes do Terraform iniciar. Se um arquivo estiver quebrado, a esteira falha imediatamente (Fail Fast), impedindo erros no Grafana.
+
+---
+
 ## 🚀 Guia de Uso (Lifecycle Management)
 
-Toda a interação é feita via **GitHub Actions**. Não altere recursos manualmente no Grafana.
+Toda a interação é feita via **GitHub Actions**.
 
 ### 1️⃣ Como Criar (Onboarding)
 Para criar monitoria para um novo serviço:
@@ -37,18 +44,16 @@ Para criar monitoria para um novo serviço:
 ---
 
 ### 2️⃣ Como Remover (Decommission)
-Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente.
-
-> **Dica:** Você só precisa saber o **Nome do Serviço**. Olhe o título do Dashboard no Grafana (ex: `Golden Signals - pix-api [dev]` -> O nome é `pix-api`).
+Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente:
 
 1.  Acesse a aba **[Actions](../../actions)**.
 2.  Selecione o workflow **"Decommission (Simples)"**.
 3.  Clique em **Run workflow**.
 4.  Preencha os campos:
-    * **Service Name:** O nome exato do serviço (ex: `pix-api`).
-    * **Ação (Segurança):**
-        * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run). **Recomendado rodar este primeiro.**
-        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão definitiva dos recursos.
+    * **Service Name:** O nome exato do serviço (Você pode encontrar no título do Dashboard no Grafana).
+    * **Ação:**
+        * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run).
+        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão dos recursos.
 5.  Clique no botão verde **Run workflow**.
 
 ---
@@ -107,7 +112,7 @@ Para evoluir esta solução para um cenário **Enterprise/Produção**, recomend
 ### Estrutura do Projeto
 ```text
 .
-├── .github/workflows/   # Pipelines de Criação e Destruição (YAML)
+├── .github/workflows/   # Pipelines de Criação, Validação e Destruição (YAML)
 ├── terraform/           # Código IaC (Motor de Criação)
 ├── scripts/             # Scripts auxiliares (Python para limpeza via API)
 └── templates/           # JSONs parametrizados do Grafana
