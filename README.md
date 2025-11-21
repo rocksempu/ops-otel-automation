@@ -8,7 +8,7 @@
 ## 🎯 O Objetivo
 Este projeto implementa uma esteira de **Observability as Code**. O objetivo é democratizar a criação de monitoramento para os times de desenvolvimento, garantindo que todo serviço novo nasça com:
 1.  **Visibilidade:** Dashboards completos (Golden Signals, RUM, Infra).
-2.  **Proatividade:** Alertas automáticos de erro e latência.
+2.  **Proatividade:** Alertas automáticos com link direto para Runbooks de resolução.
 3.  **Governança:** Tags obrigatórias e políticas de ambiente.
 
 ---
@@ -39,9 +39,9 @@ Para criar monitoria para um novo serviço:
     * **Ativar Alertas?**: Define se os alertas serão criados (Obrigatório em PRD).
 5.  Clique no botão verde **Run workflow**.
 
-✅ **Pronto!** Em menos de 1 minuto, seu dashboard estará na pasta `Dashboards Automáticos (CI/CD)` e seus alertas na área de `Alerting` do Grafana.
-
----
+✅ **Pronto!** Em menos de 1 minuto:
+* Seu dashboard estará na pasta `Dashboards Automáticos (CI/CD)`.
+* Seus alertas estarão ativos e roteados para o e-mail do Owner.
 
 ### 2️⃣ Como Remover (Decommission)
 Para remover dashboards e alertas de um serviço descontinuado ou criado erroneamente:
@@ -53,7 +53,7 @@ Para remover dashboards e alertas de um serviço descontinuado ou criado erronea
     * **Service Name:** O nome exato do serviço (Você pode encontrar no título do Dashboard no Grafana).
     * **Ação:**
         * `🔍 APENAS SIMULAR`: Verifica o que será apagado sem executar (Dry Run).
-        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão dos recursos.
+        * `💥 DESTRUIR DE VERDADE`: Executa a exclusão dos recursos via API.
 5.  Clique no botão verde **Run workflow**.
 
 ---
@@ -70,12 +70,17 @@ Esta plataforma utiliza o conceito de **Infrastructure as Code**. O código e a 
 
 ## 👮 Política de Governança (Policy as Code)
 
+### Regras de Ambiente
 A pipeline aplica regras automáticas baseadas no ambiente selecionado:
 
 | Ambiente | Regra de Alertas | Comportamento |
 | :--- | :--- | :--- |
 | **PRD (Produção)** | 🚨 **Obrigatório** | O sistema **ignora** o checkbox e força a criação dos alertas de erro e latência. Produção não pode ficar sem monitoria. |
 | **DEV / HML** | 🔓 **Opcional** | O sistema respeita a sua escolha no checkbox `Ativar Alertas`. Útil para evitar ruído em ambientes de teste. |
+
+### 📖 Runbooks Inteligentes
+Todo alerta criado pela plataforma (ex: "High Error Rate") já nasce com um campo **Runbook URL** configurado.
+* Ao receber um alerta, o operador pode clicar no link e ser direcionado para a Wiki de Troubleshooting específica, já com o contexto do serviço.
 
 ---
 
@@ -97,7 +102,7 @@ Atualmente suportamos os seguintes modelos (BTM-First):
 Nesta versão **MVP**, o arquivo de estado do Terraform (`terraform.tfstate`) é gerenciado **localmente** no Runner (Ephemeral).
 
 * **Implicação:** O Terraform não mantém histórico persistente entre execuções de diferentes serviços.
-* **Solução de Decommission:** Para garantir a destruição confiável de qualquer serviço a qualquer momento, o workflow de *Decommission* utiliza um script auxiliar (Python) que interage diretamente com a API do Grafana, localizando e removendo recursos baseados no `Service Name`. Isso garante a limpeza mesmo sem o estado local do Terraform.
+* **Solução de Decommission:** Para garantir a destruição confiável, o workflow de *Decommission* utiliza um script auxiliar (Python) que interage diretamente com a API do Grafana, localizando e removendo recursos baseados no `Service Name`.
 
 ### 🔮 Roadmap (Próximos Passos)
 Para evoluir esta solução para um cenário **Enterprise/Produção**, recomenda-se:
