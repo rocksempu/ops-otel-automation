@@ -48,3 +48,11 @@ variable "enable_alerts" {
   type        = bool
   default     = true
 }
+
+# --- Configuração de Runbooks ---
+variable "runbook_base_url" {
+  description = "URL base onde ficam os documentos de troubleshooting"
+  type        = string
+  # Pode ser uma Wiki, Confluence ou uma pasta no GitHub
+  default     = "https://github.com/rocksempu/ops-otel-automation/wiki/Runbooks"
+}
