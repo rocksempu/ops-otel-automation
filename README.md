@@ -16,7 +16,7 @@ Este projeto implementa uma esteira de **Observability as Code**. O objetivo é 
 ## 🛡️ Quality Assurance (Quality Gates)
 Para garantir a integridade da plataforma, a pipeline executa validações automáticas antes de qualquer alteração:
 
-* **JSON Linting:** Todos os templates na pasta `/templates` são validados sintaticamente antes do Terraform iniciar. Se um arquivo estiver quebrado, a esteira falha imediatamente (Fail Fast), impedindo erros no Grafana.
+* **JSON Linting:** Todos os templates na pasta `/templates` são validados sintaticamente antes do Terraform iniciar. Se um arquivo estiver quebrado, a esteira falha imediatamente (Fail Fast).
 
 ---
 
@@ -75,12 +75,12 @@ A pipeline aplica regras automáticas baseadas no ambiente selecionado:
 
 | Ambiente | Regra de Alertas | Comportamento |
 | :--- | :--- | :--- |
-| **PRD (Produção)** | 🚨 **Obrigatório** | O sistema **ignora** o checkbox e força a criação dos alertas de erro e latência. Produção não pode ficar sem monitoria. |
-| **DEV / HML** | 🔓 **Opcional** | O sistema respeita a sua escolha no checkbox `Ativar Alertas`. Útil para evitar ruído em ambientes de teste. |
+| **PRD (Produção)** | 🚨 **Obrigatório** | O sistema **ignora** o checkbox e força a criação dos alertas. Produção não pode ficar sem monitoria. |
+| **DEV / HML** | 🔓 **Opcional** | O sistema respeita a escolha do usuário. Útil para evitar ruído em testes. |
 
-### 📖 Runbooks Inteligentes
+### 📖 Runbooks Inteligentes (Docs as Code)
 Todo alerta criado pela plataforma (ex: "High Error Rate") já nasce com um campo **Runbook URL** configurado.
-* Ao receber um alerta, o operador pode clicar no link e ser direcionado para a Wiki de Troubleshooting específica, já com o contexto do serviço.
+* Ao receber um alerta, o operador clica no link e é direcionado para o arquivo Markdown de documentação (`/runbooks`) dentro deste repositório, garantindo que a documentação de troubleshooting acompanhe a versão do código.
 
 ---
 
@@ -120,4 +120,5 @@ Para evoluir esta solução para um cenário **Enterprise/Produção**, recomend
 ├── .github/workflows/   # Pipelines de Criação, Validação e Destruição (YAML)
 ├── terraform/           # Código IaC (Motor de Criação)
 ├── scripts/             # Scripts auxiliares (Python para limpeza via API)
-└── templates/           # JSONs parametrizados do Grafana
+├── templates/           # JSONs parametrizados do Grafana
+└── runbooks/            # Documentação de Troubleshooting (Markdown)
