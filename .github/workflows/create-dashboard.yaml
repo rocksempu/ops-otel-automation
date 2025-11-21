@@ -6,11 +6,11 @@ on:
       # --- SELEÇÃO DE AÇÃO ---
       action_type:
         type: choice
-        description: 'O que você quer fazer?'
+        description: 'O que voce quer fazer?'
         options:
-        - '🔍 SIMULAR (Terraform Plan)'
-        - '🚀 CRIAR DE VERDADE (Terraform Apply)'
-        default: '🔍 SIMULAR (Terraform Plan)'
+        - 'SIMULAR (Terraform Plan)'
+        - 'CRIAR DE VERDADE (Terraform Apply)'
+        default: 'SIMULAR (Terraform Plan)'
         required: true
 
       template_type:
@@ -24,7 +24,7 @@ on:
       
       # --- DADOS DO SERVIÇO ---
       service_name:
-        description: 'Nome do Serviço (Ex: ibpf-api)'
+        description: 'Nome do Servico (Ex: ibpf-api)'
         required: true
       service_namespace:
         description: 'Namespace (Ex: pix, crm)'
@@ -38,17 +38,17 @@ on:
         options: [dev, hml, prd]
         required: true
       service_version:
-        description: 'Versão (SemVer)'
+        description: 'Versao (SemVer)'
         default: '1.0.0'
         required: false
       
       # --- GOVERNANÇA (GMUD) ---
       change_ticket:
-        description: 'Número da GMUD (Obrigatório para PRD - Ex: CHG00123)'
+        description: 'Numero da GMUD (Obrigatorio para PRD - Ex: CHG00123)'
         required: false 
       
       enable_alerts:
-        description: 'Ativar Alertas? (Em PRD será sempre Ativado)'
+        description: 'Ativar Alertas? (Em PRD sera sempre Ativado)'
         type: boolean
         required: false
         default: true
@@ -58,65 +58,68 @@ jobs:
     runs-on: self-hosted
     name: "${{ inputs.action_type }}: ${{ inputs.service_name }}"
     
+    # Gate de Ambiente (Opcional - se nao usar, pode remover esta linha)
+    # environment: ${{ inputs.environment }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # --- NOVO: SIMULAÇÃO DE GATE SERVICENOW (A Teatralidade) ---
-      - name: 👮 ServiceNow Change Validation (GMUD)
+      # --- PASSO DE VALIDAÇÃO SERVICENOW (Corrigido) ---
+      - name: ServiceNow Change Validation (GMUD)
         # Regra: Só valida se for PRD
         if: ${{ inputs.environment == 'prd' }}
         run: |
           $ticket = "${{ inputs.change_ticket }}"
           
-          Write-Host "🔄 Conectando API ServiceNow (Mock)..."
+          Write-Host "[INFO] Conectando API ServiceNow (Mock)..."
           Start-Sleep -Seconds 2
           
           # Validação 1: Campo Vazio
           if ([string]::IsNullOrWhiteSpace($ticket)) {
-            Write-Error "❌ ERRO DE GOVERNANÇA: Para deploy em PRD, o número da GMUD é obrigatório."
+            Write-Error "[ERRO] GOVERNANCA: Para deploy em PRD, o numero da GMUD e obrigatorio."
             exit 1
           }
 
           # Validação 2: Formato (Simulação)
           if (-not $ticket.StartsWith("CHG")) {
-            Write-Error "❌ ERRO: O ticket '$ticket' não é válido. Formato esperado: CHGxxxxxx"
+            Write-Error "[ERRO] O ticket '$ticket' nao e valido. Formato esperado: CHGxxxxxx"
             exit 1
           }
 
-          Write-Host "🔎 Buscando status do ticket: $ticket..."
+          Write-Host "[INFO] Buscando status do ticket: $ticket..."
           Start-Sleep -Seconds 2
           
-          Write-Host "✅ Ticket Encontrado."
-          Write-Host "📋 Status: IMPLEMENTATION (Scheduled)"
-          Write-Host "📅 Janela de Mudança: VÁLIDA"
-          Write-Host "✅ APROVADO para execução."
+          Write-Host "[OK] Ticket Encontrado."
+          Write-Host "[INFO] Status: IMPLEMENTATION (Scheduled)"
+          Write-Host "[INFO] Janela de Mudanca: VALIDA"
+          Write-Host "[OK] APROVADO para execucao."
 
-      # --- QUALITY GATE (Mantido) ---
-      - name: 🛡️ Quality Gate - Validar JSONs
+      # --- QUALITY GATE ---
+      - name: Quality Gate - Validar JSONs
         run: |
           $pythonPath = "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe"
           $files = Get-ChildItem "templates\*.json"
           foreach ($file in $files) {
             Write-Host "Validando: $($file.Name)..."
             & $pythonPath -m json.tool "$($file.FullName)" > $null
-            if ($LASTEXITCODE -ne 0) { Write-Error "❌ JSON Inválido: $($file.Name)"; exit 1 }
+            if ($LASTEXITCODE -ne 0) { Write-Error "[ERRO] JSON Invalido: $($file.Name)"; exit 1 }
           }
-          Write-Host "✅ Todos os templates estão válidos!"
+          Write-Host "[OK] Todos os templates estao validos!"
 
       # --- TERRAFORM ---
       - name: Terraform Init
         working-directory: ./terraform
         run: '& "C:\Terraform\terraform.exe" init'
 
-      - name: Terraform Plan (Simulação)
-        if: ${{ inputs.action_type == '🔍 SIMULAR (Terraform Plan)' }}
+      - name: Terraform Plan (Simulacao)
+        if: ${{ inputs.action_type == 'SIMULAR (Terraform Plan)' }}
         working-directory: ./terraform
         env:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          Write-Host "🔍 EXECUTANDO SIMULAÇÃO (PLAN)..."
+          Write-Host "[INFO] EXECUTANDO SIMULACAO (PLAN)..."
           & "C:\Terraform\terraform.exe" plan `
             -var="template_type=${{ inputs.template_type }}" `
             -var="service_name=${{ inputs.service_name }}" `
@@ -126,14 +129,14 @@ jobs:
             -var="environment=${{ inputs.environment }}" `
             -var="enable_alerts=${{ inputs.enable_alerts }}"
 
-      - name: Terraform Apply (Execução Real)
-        if: ${{ inputs.action_type == '🚀 CRIAR DE VERDADE (Terraform Apply)' }}
+      - name: Terraform Apply (Execucao Real)
+        if: ${{ inputs.action_type == 'CRIAR DE VERDADE (Terraform Apply)' }}
         working-directory: ./terraform
         env:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          Write-Host "🚀 APLICANDO MUDANÇAS..."
+          Write-Host "[INFO] APLICANDO MUDANCAS..."
           & "C:\Terraform\terraform.exe" apply -auto-approve `
             -var="template_type=${{ inputs.template_type }}" `
             -var="service_name=${{ inputs.service_name }}" `
