@@ -4,23 +4,26 @@ import os
 import urllib3
 from urllib.parse import quote
 
-# --- CONFIGURACAO PARA LAB (Ignorar SSL) ---
+# --- CONFIGURACAO (SSL Ignorado) ---
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 VERIFY_SSL = False 
-# -------------------------------------------
+# -----------------------------------
 
 # Configuração
 GRAFANA_URL = os.environ.get("GRAFANA_URL")
 GRAFANA_TOKEN = os.environ.get("GRAFANA_TOKEN")
 SERVICE_NAME = sys.argv[1]
 
-# Verifica se é Dry Run (Simulação)
+# Tenta pegar o Namespace via argumento (se nao vier, usa coringa ou busca ampla)
+# Nota: Para o script ser preciso, idealmente precisariamos passar o Namespace tambem.
+# Mas para manter simples, vamos buscar qualquer pasta que contenha o nome do servico.
+
 DRY_RUN = False
-if len(sys.argv) > 2 and sys.argv[2] == "--dry-run":
+if len(sys.argv) > 2 and "--dry-run" in sys.argv:
     DRY_RUN = True
 
 if not GRAFANA_URL or not GRAFANA_TOKEN:
-    print("[ERRO] Credenciais do Grafana nao encontradas.")
+    print("[ERRO] Credenciais nao encontradas.")
     sys.exit(1)
 
 HEADERS = {
@@ -29,7 +32,7 @@ HEADERS = {
 }
 
 mode_str = "[SIMULACAO]" if DRY_RUN else "[EXECUCAO]"
-print(f"--- {mode_str} Limpeza para o servico: {SERVICE_NAME} ---")
+print(f"--- {mode_str} Decommission para: {SERVICE_NAME} ---")
 
 def delete_request(url, description):
     try:
@@ -37,11 +40,8 @@ def delete_request(url, description):
             check = requests.get(url, headers=HEADERS, verify=VERIFY_SSL)
             if check.status_code >= 200 and check.status_code < 300:
                 print(f"[ENCONTRADO] {description} (Seria deletado)")
-            elif check.status_code == 404:
-                print(f"[NAO ENCONTRADO] {description}")
             else:
-                # Se nao da pra fazer GET (ex: endpoint de delete only), assumimos que existe para teste
-                print(f"[VERIFICAR] {description} (Endpoint nao permite checagem simples)")
+                print(f"[NAO ENCONTRADO] {description} (URL: {url})")
         else:
             resp = requests.delete(url, headers=HEADERS, verify=VERIFY_SSL)
             if resp.status_code >= 200 and resp.status_code < 300:
@@ -49,59 +49,49 @@ def delete_request(url, description):
             elif resp.status_code == 404:
                 print(f"[INFO] Ja nao existe: {description}")
             else:
-                print(f"[ERRO] Falha ao deletar {description}: {resp.status_code} - {resp.text}")
+                print(f"[ERRO] Falha ao deletar {description}: {resp.text}")
     except Exception as e:
         print(f"[ERRO CRITICO] Conexao falhou: {str(e)}")
 
-# 1. Deletar Dashboards (Mantido igual, pois funciona)
-dash_types = ["golden", "detalhes", "rum"]
-for dtype in dash_types:
-    uid = f"{SERVICE_NAME}-{dtype}"
-    delete_request(f"{GRAFANA_URL}/api/dashboards/uid/{uid}", f"Dashboard ({uid})")
+# ==============================================================================
+# Lógica Nova: Buscar a Pasta do Projeto pelo Nome do Serviço
+# Como a pasta chama "Namespace - Servico [Env]", vamos buscar pelo trecho do nome.
+# ==============================================================================
 
-# 2. Deletar Grupo de Alertas e Pasta
-# Primeiro, precisamos achar o UID da pasta
-search_query = f"Alertas Automáticos (CI/CD) - {SERVICE_NAME}"
-# Fallback para sem acento se necessario
-search_query_no_accent = f"Alertas Automaticos (CI/CD) - {SERVICE_NAME}"
-
-folder_uid = None
-folder_title = None
+search_query = f"{SERVICE_NAME} ["
+print(f"--- Buscando pastas contendo: '{search_query}' ---")
 
 try:
-    # Tenta com acento
     resp = requests.get(f"{GRAFANA_URL}/api/search?query={search_query}&type=dash-folder", headers=HEADERS, verify=VERIFY_SSL)
-    data = resp.json()
+    folders = resp.json()
     
-    if len(data) == 0:
-        # Tenta sem acento
-        resp = requests.get(f"{GRAFANA_URL}/api/search?query={search_query_no_accent}&type=dash-folder", headers=HEADERS, verify=VERIFY_SSL)
-        data = resp.json()
+    if len(folders) == 0:
+        print("[INFO] Nenhuma pasta de projeto encontrada.")
+    
+    for folder in folders:
+        folder_uid = folder['uid']
+        folder_title = folder['title']
+        
+        # Dupla checagem para garantir que nao estamos apagando pasta de outro servico com nome parecido
+        if f"- {SERVICE_NAME} [" not in folder_title:
+            print(f"[SKIP] Pulando pasta '{folder_title}' (Match inseguro)")
+            continue
 
-    if len(data) > 0:
-        folder_uid = data[0]['uid']
-        folder_title = data[0]['title']
-        print(f"[INFO] Pasta de Alertas encontrada: {folder_title} ({folder_uid})")
-    else:
-        print("[INFO] Nenhuma pasta de alertas encontrada.")
+        print(f"--- Processando pasta: {folder_title} ({folder_uid}) ---")
+
+        # 1. Deletar Regras de Alerta (Provisioning API)
+        # O nome do grupo de regras padrao eh "Alertas - {SERVICE_NAME}"
+        group_name = f"Alertas - {SERVICE_NAME}"
+        safe_group_name = quote(group_name)
+        
+        rule_url = f"{GRAFANA_URL}/api/v1/provisioning/folder/{folder_uid}/rule-groups/{safe_group_name}"
+        delete_request(rule_url, f"Grupo de Regras ({group_name})")
+
+        # 2. Deletar a Pasta (Isso apaga os Dashboards dentro automaticamente)
+        folder_url = f"{GRAFANA_URL}/api/folders/{folder_uid}"
+        delete_request(folder_url, f"Pasta do Projeto ({folder_title})")
 
 except Exception as e:
-    print(f"[ERRO] Falha ao buscar pasta: {str(e)}")
-
-if folder_uid:
-    # Definir o nome do grupo de regras (Padrão do Terraform)
-    group_name = f"Alertas - {SERVICE_NAME}"
-    safe_group_name = quote(group_name) # Codifica espaços para URL (%20)
-
-    # Tenta deletar o GRUPO DE REGRAS via API de Provisionamento (Ignora travas)
-    # Endpoint: DELETE /api/v1/provisioning/folder/{folder_uid}/rule-groups/{group_name}
-    rule_url = f"{GRAFANA_URL}/api/v1/provisioning/folder/{folder_uid}/rule-groups/{safe_group_name}"
-    
-    print(f"[TENTATIVA] Deletando grupo de regras: {group_name}...")
-    delete_request(rule_url, "Grupo de Regras de Alerta")
-
-    # Agora deleta a pasta
-    folder_url = f"{GRAFANA_URL}/api/folders/{folder_uid}"
-    delete_request(folder_url, "Pasta de Alertas")
+    print(f"[ERRO] Falha na busca/remocao: {str(e)}")
 
 print(f"--- {mode_str} Fim ---")
