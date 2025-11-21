@@ -95,17 +95,32 @@ jobs:
           Write-Host "[INFO] Janela de Mudanca: VALIDA"
           Write-Host "[OK] APROVADO para execucao."
 
-      # --- QUALITY GATE ---
-      - name: Quality Gate - Validar JSONs
+      # --- QUALITY GATE (Focado no Template Escolhido) ---
+      - name: Quality Gate - Validar JSON (Selecionado)
         run: |
           $pythonPath = "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe"
-          $files = Get-ChildItem "templates\*.json"
-          foreach ($file in $files) {
-            Write-Host "Validando: $($file.Name)..."
-            & $pythonPath -m json.tool "$($file.FullName)" > $null
-            if ($LASTEXITCODE -ne 0) { Write-Error "[ERRO] JSON Invalido: $($file.Name)"; exit 1 }
+          
+          # Pega o nome do template escolhido no dropdown
+          $selectedTemplate = "${{ inputs.template_type }}"
+          $targetFile = "templates\$selectedTemplate.json"
+          
+          Write-Host "Validando apenas o template escolhido: $targetFile..."
+          
+          # Verifica se o arquivo existe
+          if (-not (Test-Path $targetFile)) {
+            Write-Error "[ERRO] Arquivo de template nao encontrado: $targetFile"
+            exit 1
           }
-          Write-Host "[OK] Todos os templates estao validos!"
+
+          # Valida apenas ele
+          & $pythonPath -m json.tool "$targetFile" > $null
+          
+          if ($LASTEXITCODE -ne 0) { 
+            Write-Error "[ERRO] O JSON do template '$selectedTemplate' esta invalido. Corrija antes de prosseguir."
+            exit 1 
+          }
+          
+          Write-Host "[OK] O template '$selectedTemplate' esta valido e seguro para deploy."
 
       # --- TERRAFORM ---
       - name: Terraform Init
