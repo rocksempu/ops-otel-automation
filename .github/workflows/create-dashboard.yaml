@@ -3,6 +3,16 @@ name: Criar Dashboard (Self-Service)
 on:
   workflow_dispatch:
     inputs:
+      # --- NOVO: SELEÇÃO DE AÇÃO (Manual Approve) ---
+      action_type:
+        type: choice
+        description: 'O que você quer fazer?'
+        options:
+        - '🔍 SIMULAR (Terraform Plan)'
+        - '🚀 CRIAR DE VERDADE (Terraform Apply)'
+        default: '🔍 SIMULAR (Terraform Plan)'
+        required: true
+
       template_type:
         type: choice
         description: 'Modelo de Dashboard'
@@ -12,7 +22,7 @@ on:
         - rum
         required: true
       
-      # Inputs de Governança Obrigatória (Conforme MVP)
+      # Inputs de Governança Obrigatória
       service_name:
         description: 'Nome do Serviço (Ex: ibpf-api)'
         required: true
@@ -42,15 +52,13 @@ on:
 jobs:
   deploy-dashboard:
     runs-on: self-hosted
-    name: "Criar: ${{ inputs.template_type }} para ${{ inputs.service_name }}"
+    name: "${{ inputs.action_type }}: ${{ inputs.service_name }}"
     
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # --- NOVO: QUALITY GATE (Linting) ---
-      # Valida se os templates JSON estão com a sintaxe correta antes de aplicar.
-      # Usa o Python que já temos instalado.
+      # --- 1. QUALITY GATE (Mantido do seu original) ---
       - name: 🛡️ Quality Gate - Validar JSONs
         run: |
           $pythonPath = "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe"
@@ -67,18 +75,38 @@ jobs:
           }
           Write-Host "✅ Todos os templates estão válidos!"
 
-      # --- FIM DO QUALITY GATE ---
-
+      # --- 2. TERRAFORM INIT (Sempre roda) ---
       - name: Terraform Init
         working-directory: ./terraform
         run: '& "C:\Terraform\terraform.exe" init'
 
-      - name: Terraform Apply
+      # --- 3. PLAN (Roda apenas se escolheu SIMULAR) ---
+      - name: Terraform Plan (Simulação)
+        if: ${{ inputs.action_type == '🔍 SIMULAR (Terraform Plan)' }}
         working-directory: ./terraform
         env:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
         run: |
+          Write-Host "🔍 EXECUTANDO SIMULAÇÃO (PLAN)... NADA SERÁ CRIADO."
+          & "C:\Terraform\terraform.exe" plan `
+            -var="template_type=${{ inputs.template_type }}" `
+            -var="service_name=${{ inputs.service_name }}" `
+            -var="service_namespace=${{ inputs.service_namespace }}" `
+            -var="service_owner=${{ inputs.service_owner }}" `
+            -var="service_version=${{ inputs.service_version }}" `
+            -var="environment=${{ inputs.environment }}" `
+            -var="enable_alerts=${{ inputs.enable_alerts }}"
+
+      # --- 4. APPLY (Roda apenas se escolheu CRIAR) ---
+      - name: Terraform Apply (Execução Real)
+        if: ${{ inputs.action_type == '🚀 CRIAR DE VERDADE (Terraform Apply)' }}
+        working-directory: ./terraform
+        env:
+          TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
+          TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
+        run: |
+          Write-Host "🚀 APLICANDO MUDANÇAS NO GRAFANA..."
           & "C:\Terraform\terraform.exe" apply -auto-approve `
             -var="template_type=${{ inputs.template_type }}" `
             -var="service_name=${{ inputs.service_name }}" `
