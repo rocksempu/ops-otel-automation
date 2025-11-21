@@ -44,6 +44,24 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       "owner"        = var.service_owner
     }
 
+    # --- NOVO: Runbook e Instruções (Item 10 do MVP) ---
+    annotations = {
+      summary = "Taxa de erro > 5% em ${var.service_name}"
+      
+      # [cite_start]Instruções rápidas direto no alerta [cite: 143]
+      description = <<-EOT
+        O serviço está apresentando alta taxa de erros.
+        Checklist de Resolução:
+        1. Verifique os logs no Dashboard de Detalhes.
+        2. Cheque status de Circuit Breaker e dependências.
+        3. Avalie rollback se houve deploy recente.
+      EOT
+      
+      # O Link clicável para a doc completa
+      runbook_url = "${var.runbook_base_url}/HighErrorRate?service=${var.service_name}"
+    }
+    # ---------------------------------------------------
+
     # Query A
     data {
       ref_id = "A"
