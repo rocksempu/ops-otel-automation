@@ -3,7 +3,7 @@ name: Criar Dashboard (Self-Service)
 on:
   workflow_dispatch:
     inputs:
-      # --- NOVO: SELEÇÃO DE AÇÃO (Manual Approve) ---
+      # --- SELEÇÃO DE AÇÃO ---
       action_type:
         type: choice
         description: 'O que você quer fazer?'
@@ -22,7 +22,7 @@ on:
         - rum
         required: true
       
-      # Inputs de Governança Obrigatória
+      # --- DADOS DO SERVIÇO ---
       service_name:
         description: 'Nome do Serviço (Ex: ibpf-api)'
         required: true
@@ -42,7 +42,11 @@ on:
         default: '1.0.0'
         required: false
       
-      # Controle de Alertas
+      # --- GOVERNANÇA (GMUD) ---
+      change_ticket:
+        description: 'Número da GMUD (Obrigatório para PRD - Ex: CHG00123)'
+        required: false 
+      
       enable_alerts:
         description: 'Ativar Alertas? (Em PRD será sempre Ativado)'
         type: boolean
@@ -58,29 +62,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # --- 1. QUALITY GATE (Mantido do seu original) ---
+      # --- NOVO: SIMULAÇÃO DE GATE SERVICENOW (A Teatralidade) ---
+      - name: 👮 ServiceNow Change Validation (GMUD)
+        # Regra: Só valida se for PRD
+        if: ${{ inputs.environment == 'prd' }}
+        run: |
+          $ticket = "${{ inputs.change_ticket }}"
+          
+          Write-Host "🔄 Conectando API ServiceNow (Mock)..."
+          Start-Sleep -Seconds 2
+          
+          # Validação 1: Campo Vazio
+          if ([string]::IsNullOrWhiteSpace($ticket)) {
+            Write-Error "❌ ERRO DE GOVERNANÇA: Para deploy em PRD, o número da GMUD é obrigatório."
+            exit 1
+          }
+
+          # Validação 2: Formato (Simulação)
+          if (-not $ticket.StartsWith("CHG")) {
+            Write-Error "❌ ERRO: O ticket '$ticket' não é válido. Formato esperado: CHGxxxxxx"
+            exit 1
+          }
+
+          Write-Host "🔎 Buscando status do ticket: $ticket..."
+          Start-Sleep -Seconds 2
+          
+          Write-Host "✅ Ticket Encontrado."
+          Write-Host "📋 Status: IMPLEMENTATION (Scheduled)"
+          Write-Host "📅 Janela de Mudança: VÁLIDA"
+          Write-Host "✅ APROVADO para execução."
+
+      # --- QUALITY GATE (Mantido) ---
       - name: 🛡️ Quality Gate - Validar JSONs
         run: |
           $pythonPath = "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe"
           $files = Get-ChildItem "templates\*.json"
-          
           foreach ($file in $files) {
             Write-Host "Validando: $($file.Name)..."
             & $pythonPath -m json.tool "$($file.FullName)" > $null
-            
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "❌ JSON Inválido: $($file.Name)"
-              exit 1
-            }
+            if ($LASTEXITCODE -ne 0) { Write-Error "❌ JSON Inválido: $($file.Name)"; exit 1 }
           }
           Write-Host "✅ Todos os templates estão válidos!"
 
-      # --- 2. TERRAFORM INIT (Sempre roda) ---
+      # --- TERRAFORM ---
       - name: Terraform Init
         working-directory: ./terraform
         run: '& "C:\Terraform\terraform.exe" init'
 
-      # --- 3. PLAN (Roda apenas se escolheu SIMULAR) ---
       - name: Terraform Plan (Simulação)
         if: ${{ inputs.action_type == '🔍 SIMULAR (Terraform Plan)' }}
         working-directory: ./terraform
@@ -88,7 +116,7 @@ jobs:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          Write-Host "🔍 EXECUTANDO SIMULAÇÃO (PLAN)... NADA SERÁ CRIADO."
+          Write-Host "🔍 EXECUTANDO SIMULAÇÃO (PLAN)..."
           & "C:\Terraform\terraform.exe" plan `
             -var="template_type=${{ inputs.template_type }}" `
             -var="service_name=${{ inputs.service_name }}" `
@@ -98,7 +126,6 @@ jobs:
             -var="environment=${{ inputs.environment }}" `
             -var="enable_alerts=${{ inputs.enable_alerts }}"
 
-      # --- 4. APPLY (Roda apenas se escolheu CRIAR) ---
       - name: Terraform Apply (Execução Real)
         if: ${{ inputs.action_type == '🚀 CRIAR DE VERDADE (Terraform Apply)' }}
         working-directory: ./terraform
@@ -106,7 +133,7 @@ jobs:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
         run: |
-          Write-Host "🚀 APLICANDO MUDANÇAS NO GRAFANA..."
+          Write-Host "🚀 APLICANDO MUDANÇAS..."
           & "C:\Terraform\terraform.exe" apply -auto-approve `
             -var="template_type=${{ inputs.template_type }}" `
             -var="service_name=${{ inputs.service_name }}" `

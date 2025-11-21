@@ -3,10 +3,18 @@ name: Decommission (Simples)
 on:
   workflow_dispatch:
     inputs:
+      # --- DADOS DE DISCOVERY ---
       service_name:
         description: 'Nome do Serviço (Veja no Título do Dashboard)'
         required: true
       
+      environment:
+        type: choice
+        description: 'Ambiente'
+        options: [dev, hml, prd]
+        required: true
+
+      # --- O BOTÃO DE SEGURANÇA ---
       action_type:
         type: choice
         description: 'O que você quer fazer?'
@@ -15,6 +23,11 @@ on:
         - '💥 DESTRUIR DE VERDADE (Execute)'
         default: '🔍 APENAS SIMULAR (Dry Run)'
         required: true
+
+      # --- GOVERNANÇA (GMUD) ---
+      change_ticket:
+        description: 'Número da GMUD (Obrigatório para DESTRUIR em PRD)'
+        required: false
 
 jobs:
   manage-lifecycle:
@@ -25,11 +38,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Instalação do Requests usando o caminho completo do Python
       - name: Instalar Python Requests
         run: '& "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe" -m pip install requests'
 
-      # PASSO 1: MODO SIMULAÇÃO (Dry Run)
+      # --- NOVO: SIMULAÇÃO DE GATE SERVICENOW (Para Decommission) ---
+      - name: 👮 ServiceNow Change Validation (GMUD)
+        # Regra: Só valida se for PRD E se for DESTRUIR DE VERDADE
+        if: ${{ inputs.environment == 'prd' && inputs.action_type == '💥 DESTRUIR DE VERDADE (Execute)' }}
+        run: |
+          $ticket = "${{ inputs.change_ticket }}"
+          
+          Write-Host "🔄 Validando permissão de destruição em PRD..."
+          Start-Sleep -Seconds 1
+          
+          if ([string]::IsNullOrWhiteSpace($ticket)) {
+            Write-Error "❌ ERRO DE GOVERNANÇA: Para remover recursos de PRD, a GMUD é obrigatória."
+            exit 1
+          }
+
+          if (-not $ticket.StartsWith("CHG")) {
+            Write-Error "❌ ERRO: Ticket inválido. Formato esperado: CHGxxxxxx"
+            exit 1
+          }
+
+          Write-Host "✅ GMUD $ticket aprovada para execução de DECOMMISSION."
+
+      # --- PASSOS ORIGINAIS ---
       - name: Simular Limpeza (Dry Run)
         if: ${{ inputs.action_type == '🔍 APENAS SIMULAR (Dry Run)' }}
         env:
@@ -38,7 +72,6 @@ jobs:
         run: |
           & "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe" scripts/clean_grafana.py "${{ inputs.service_name }}" --dry-run
 
-      # PASSO 2: MODO DESTRUIÇÃO (Execute)
       - name: Executar Limpeza Real
         if: ${{ inputs.action_type == '💥 DESTRUIR DE VERDADE (Execute)' }}
         env:
