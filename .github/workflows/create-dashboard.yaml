@@ -32,7 +32,7 @@ on:
         default: '1.0.0'
         required: false
       
-      # Novo Input: Controle de Alertas (Policy as Code)
+      # Controle de Alertas
       enable_alerts:
         description: 'Ativar Alertas? (Em PRD será sempre Ativado)'
         type: boolean
@@ -48,11 +48,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Setup removido para usar instalação manual local e evitar erro de wrapper
+      # --- NOVO: QUALITY GATE (Linting) ---
+      # Valida se os templates JSON estão com a sintaxe correta antes de aplicar.
+      # Usa o Python que já temos instalado.
+      - name: 🛡️ Quality Gate - Validar JSONs
+        run: |
+          $pythonPath = "C:\Users\FabioPaixao\AppData\Local\Programs\Python\Python313\python.exe"
+          $files = Get-ChildItem "templates\*.json"
+          
+          foreach ($file in $files) {
+            Write-Host "Validando: $($file.Name)..."
+            & $pythonPath -m json.tool "$($file.FullName)" > $null
+            
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "❌ JSON Inválido: $($file.Name)"
+              exit 1
+            }
+          }
+          Write-Host "✅ Todos os templates estão válidos!"
+
+      # --- FIM DO QUALITY GATE ---
 
       - name: Terraform Init
         working-directory: ./terraform
-        # O & comercial é obrigatório no PowerShell para rodar executáveis com caminho entre aspas
         run: '& "C:\Terraform\terraform.exe" init'
 
       - name: Terraform Apply
@@ -60,7 +78,6 @@ jobs:
         env:
           TF_VAR_grafana_url: ${{ secrets.GRAFANA_URL }}
           TF_VAR_grafana_auth: ${{ secrets.GRAFANA_TOKEN }}
-        # Nota: No PowerShell, a quebra de linha é feita com CRASE (`), não barra invertida (\)
         run: |
           & "C:\Terraform\terraform.exe" apply -auto-approve `
             -var="template_type=${{ inputs.template_type }}" `

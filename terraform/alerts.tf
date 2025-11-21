@@ -1,20 +1,14 @@
-# Lógica de Governança
+# Lógica de Governança (Policy as Code)
 locals {
   should_create = var.environment == "prd" || var.enable_alerts ? 1 : 0
 }
 
-# Datasource
+# Datasource (Busca o UID do Prometheus)
 data "grafana_data_source" "prometheus" {
   name = "prometheus"
 }
 
-# 1. Pasta
-resource "grafana_folder" "alerts_folder" {
-  count = local.should_create
-  title = "Alertas Automáticos (CI/CD) - ${var.service_name}"
-}
-
-# 2. Ponto de Contato (Email)
+# 1. Ponto de Contato (Email da Squad)
 resource "grafana_contact_point" "squad_email" {
   count = local.should_create
   name  = "${var.service_owner}-email"
@@ -25,12 +19,15 @@ resource "grafana_contact_point" "squad_email" {
   }
 }
 
-# 3. Regra de Alerta
+# 2. Regra de Alerta: Alta Taxa de Erros (Golden Signal)
 resource "grafana_rule_group" "golden_signals_alerts" {
   count = local.should_create
 
   name             = "Alertas - ${var.service_name}"
-  folder_uid       = grafana_folder.alerts_folder[0].uid
+  
+  # Aponta para a pasta UNIFICADA criada no main.tf
+  folder_uid       = grafana_folder.project_folder.uid
+  
   interval_seconds = 60
 
   rule {
@@ -44,13 +41,32 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       "owner"        = var.service_owner
     }
 
-    # Query A
+    # Anotações (Runbook e Instruções)
+    annotations = {
+      summary = "Taxa de erro > 5% em ${var.service_name}"
+      
+      description = <<-EOT
+        O serviço está apresentando alta taxa de erros.
+        Checklist de Resolução:
+        1. Verifique os logs no Dashboard de Detalhes.
+        2. Cheque status de Circuit Breaker e dependências.
+        3. Avalie rollback se houve deploy recente.
+      EOT
+      
+      # Link para a documentação no Git (com .md)
+      runbook_url = "${var.runbook_base_url}/HighErrorRate.md?service=${var.service_name}"
+    }
+
+    # Query A: Taxa de Erro
     data {
       ref_id = "A"
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
       relative_time_range {
         from = 600
         to   = 0
       }
+      
       datasource_uid = data.grafana_data_source.prometheus.uid
       model = jsonencode({
         expr          = "sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\", outcome=\"SERVER_ERROR\"}[5m])) / sum(rate(http_server_requests_seconds_count{service_name=\"${var.service_name}\"}[5m])) * 100"
@@ -60,13 +76,16 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
-    # Query B
+    # Query B: Reduce (Média)
     data {
       ref_id = "B"
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
       relative_time_range {
         from = 600
         to   = 0
       }
+      
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "A"
@@ -76,13 +95,16 @@ resource "grafana_rule_group" "golden_signals_alerts" {
       })
     }
 
-    # Query C
+    # Query C: Threshold (> 5%)
     data {
       ref_id = "C"
+      
+      # CORREÇÃO: Quebra de linha obrigatória aqui
       relative_time_range {
         from = 600
         to   = 0
       }
+      
       datasource_uid = "__expr__"
       model = jsonencode({
         expression = "B"
@@ -94,7 +116,7 @@ resource "grafana_rule_group" "golden_signals_alerts" {
   }
 }
 
-# 4. Roteamento de Notificação
+# 3. Roteamento de Notificação
 resource "grafana_notification_policy" "route_policy" {
   count = local.should_create
 

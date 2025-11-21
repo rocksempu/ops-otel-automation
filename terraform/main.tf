@@ -32,14 +32,17 @@ locals {
   })
 }
 
-# Cria a Pasta no Grafana (se não existir)
-resource "grafana_folder" "ci_cd_folder" {
-  title = "Dashboards Automáticos (CI/CD)"
+# 1. PASTA UNIFICADA DO PROJETO
+# Agora criamos uma pasta específica para este serviço/ambiente
+# Exemplo: "Pix - api-transacoes [prd]"
+resource "grafana_folder" "project_folder" {
+  title = "${var.service_namespace} - ${var.service_name} [${var.environment}]"
 }
 
-# Cria o Dashboard dentro da pasta
+# 2. DASHBOARD
+# O dashboard é criado dentro da pasta específica do projeto
 resource "grafana_dashboard" "self_service" {
   config_json = local.dashboard_json
-  folder      = grafana_folder.ci_cd_folder.id
+  folder      = grafana_folder.project_folder.id
   overwrite   = true
 }
